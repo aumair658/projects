@@ -1,10 +1,18 @@
 """
 GitHub App webhook receiver + Terraform PR reviewer.
 
-Flow: verify webhook signature -> filter to pull_request events touching
-*.tf files -> mint a GitHub App JWT and exchange it for an installation
-token -> pull the changed .tf files at the PR head -> run tfsec against
-them -> post findings as a PR comment.
+Flow: verify webhook signature -> filter to pull_request events that touch
+at least one *.tf file -> mint a GitHub App JWT and exchange it for an
+installation token -> pull *every* .tf file in the repo at both the PR's
+base and head SHAs -> run tfsec against each full tree -> diff the two
+result sets so the comment only calls out findings the PR *introduces*,
+while still surfacing how much pre-existing debt remains -> post as a PR
+comment.
+
+Full-tree (not diff-only) scanning is deliberate: a diff-only scan is
+blind to vulnerable resources sitting in files the PR never touches.
+Scanning both base and head and diffing is what avoids re-reporting that
+same pre-existing debt on every single PR.
 
 Runs as a Lambda behind a public Function URL (authorization_type=NONE) -
 GitHub can't sign requests with AWS SigV4, so auth is the HMAC signature
@@ -52,27 +60,29 @@ def lambda_handler(event, context):
     repo_name = repo["name"]
     pr_number = pr["number"]
     head_sha = pr["head"]["sha"]
+    base_sha = pr["base"]["sha"]
     installation_id = body["installation"]["id"]
 
     token = _installation_token(installation_id)
 
-    tf_files = [
-        f
-        for f in _api_request(
-            "GET", f"{GITHUB_API}/repos/{owner}/{repo_name}/pulls/{pr_number}/files", token
-        )
-        if f["filename"].endswith(".tf") and f["status"] != "removed"
-    ]
-    if not tf_files:
+    # Cheap early exit: don't pay for two full-tree scans on a PR that
+    # doesn't touch Terraform at all (e.g. a docs-only or workflow-only PR).
+    changed_files = _api_request(
+        "GET", f"{GITHUB_API}/repos/{owner}/{repo_name}/pulls/{pr_number}/files", token
+    )
+    if not any(f["filename"].endswith(".tf") for f in changed_files):
         return _response(200, "ignored: no .tf changes")
 
-    with tempfile.TemporaryDirectory() as scan_dir:
-        for f in tf_files:
-            _download_file(owner, repo_name, f["filename"], head_sha, token, scan_dir)
+    with tempfile.TemporaryDirectory() as base_dir, tempfile.TemporaryDirectory() as head_dir:
+        _download_repo_tf_files(owner, repo_name, base_sha, token, base_dir)
+        _download_repo_tf_files(owner, repo_name, head_sha, token, head_dir)
 
-        findings = _run_tfsec(scan_dir)
+        base_findings = _run_tfsec(base_dir)
+        head_findings = _run_tfsec(head_dir)
 
-    comment = _format_comment(findings, head_sha)
+    new_findings, resolved_count, still_open_count = _diff_findings(base_findings, head_findings)
+
+    comment = _format_comment(new_findings, resolved_count, still_open_count, head_sha)
     _api_request(
         "POST",
         f"{GITHUB_API}/repos/{owner}/{repo_name}/issues/{pr_number}/comments",
@@ -80,7 +90,7 @@ def lambda_handler(event, context):
         body={"body": comment},
     )
 
-    return _response(200, f"posted {len(findings)} finding(s)")
+    return _response(200, f"posted {len(new_findings)} new finding(s)")
 
 
 # -----------------------------------------------------------------------------
@@ -144,18 +154,33 @@ def _installation_token(installation_id: int) -> str:
 # -----------------------------------------------------------------------------
 
 
-def _download_file(owner: str, repo: str, path: str, ref: str, token: str, scan_dir: str) -> None:
-    resp = _api_request(
+def _download_repo_tf_files(owner: str, repo: str, ref: str, token: str, dest_dir: str) -> None:
+    """Download every .tf file in the repo at `ref` into dest_dir, preserving
+    the repo's directory layout so tfsec resolves cross-file references
+    within that tree correctly."""
+    tree = _api_request(
         "GET",
-        f"{GITHUB_API}/repos/{owner}/{repo}/contents/{path}?ref={ref}",
+        f"{GITHUB_API}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1",
         token,
     )
-    content = base64.b64decode(resp["content"])
+    tf_blobs = [
+        entry
+        for entry in tree.get("tree", [])
+        if entry["type"] == "blob" and entry["path"].endswith(".tf")
+    ]
 
-    dest = os.path.join(scan_dir, path)
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
-    with open(dest, "wb") as f:
-        f.write(content)
+    for entry in tf_blobs:
+        blob = _api_request(
+            "GET",
+            f"{GITHUB_API}/repos/{owner}/{repo}/git/blobs/{entry['sha']}",
+            token,
+        )
+        content = base64.b64decode(blob["content"])
+
+        dest = os.path.join(dest_dir, entry["path"])
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "wb") as f:
+            f.write(content)
 
 
 def _run_tfsec(scan_dir: str) -> list[dict]:
@@ -172,22 +197,54 @@ def _run_tfsec(scan_dir: str) -> list[dict]:
     return parsed.get("results") or []
 
 
-def _format_comment(findings: list[dict], head_sha: str) -> str:
-    if not findings:
-        return f"**tf_pr_bot (tfsec)**: no issues found in the Terraform changes at `{head_sha[:7]}`."
+def _finding_key(finding: dict) -> tuple:
+    # (rule, resource) rather than (rule, file, line) - a finding is "the
+    # same" pre-existing issue even if an unrelated formatting change in
+    # the PR shifts its line number.
+    return (finding.get("rule_id", ""), finding.get("resource", ""))
 
-    lines = [
-        f"**tf_pr_bot (tfsec)**: {len(findings)} finding(s) in the Terraform changes at `{head_sha[:7]}`.",
-        "",
-    ]
-    for r in findings:
-        loc = r.get("location", {})
-        filename = loc.get("filename", "?")
-        start = loc.get("start_line", "?")
-        severity = r.get("severity", "?")
-        rule_id = r.get("rule_id", "?")
-        description = r.get("description", "")
-        lines.append(f"- **[{severity}] {rule_id}** `{filename}:{start}` - {description}")
+
+def _diff_findings(
+    base_findings: list[dict], head_findings: list[dict]
+) -> tuple[list[dict], int, int]:
+    base_keys = {_finding_key(f) for f in base_findings}
+    head_keys = {_finding_key(f) for f in head_findings}
+
+    new_findings = [f for f in head_findings if _finding_key(f) not in base_keys]
+    resolved_count = len(base_keys - head_keys)
+    still_open_count = len(base_keys & head_keys)
+
+    return new_findings, resolved_count, still_open_count
+
+
+def _format_comment(
+    new_findings: list[dict], resolved_count: int, still_open_count: int, head_sha: str
+) -> str:
+    header = f"**tf_pr_bot (tfsec)** - full-repo scan at `{head_sha[:7]}`, diffed against the PR base."
+
+    status_bits = []
+    if new_findings:
+        status_bits.append(f"{len(new_findings)} new finding(s) introduced by this PR")
+    else:
+        status_bits.append("no new findings introduced by this PR")
+    if resolved_count:
+        status_bits.append(f"{resolved_count} pre-existing finding(s) resolved")
+    if still_open_count:
+        status_bits.append(f"{still_open_count} pre-existing finding(s) still open")
+
+    lines = [header, "", "- " + "\n- ".join(status_bits)]
+
+    if new_findings:
+        lines.append("")
+        lines.append("New findings:")
+        for r in new_findings:
+            loc = r.get("location", {})
+            filename = loc.get("filename", "?")
+            start = loc.get("start_line", "?")
+            severity = r.get("severity", "?")
+            rule_id = r.get("rule_id", "?")
+            description = r.get("description", "")
+            lines.append(f"- **[{severity}] {rule_id}** `{filename}:{start}` - {description}")
 
     return "\n".join(lines)
 

@@ -6,10 +6,10 @@
 
 terraform {
   backend "s3" {
-    bucket         = "REPLACE_WITH_STATE_BUCKET_NAME"
+    bucket         = "tf-pr-reviewer-test-tfstate-369634474910"
     key            = "tf-pr-reviewer-test/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "REPLACE_WITH_LOCK_TABLE_NAME"
+    dynamodb_table = "tf-pr-reviewer-test-tfstate-lock"
     encrypt        = true
   }
 }

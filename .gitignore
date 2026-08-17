@@ -4,3 +4,6 @@
 
 .DS_Store
 **/.DS_Store
+
+# Personal Claude Code settings/permissions, not shared with the team.
+.claude/settings.local.json

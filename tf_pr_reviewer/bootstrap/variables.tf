@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "state_bucket_name" {
   description = "Globally-unique name for the Terraform remote state bucket"
   type        = string
-  default     = "tf-pr-reviewer-test-tfstate-change-me"
+  default     = "tf-pr-reviewer-test-tfstate-369634474910"
 }
 
 variable "lock_table_name" {
@@ -19,13 +19,13 @@ variable "lock_table_name" {
 variable "github_repo" {
   description = "GitHub repo allowed to assume the deploy role, as \"org/repo\". This is the monorepo root repo (e.g. the \"projects\" repo that contains tf_pr_reviewer/ as a subdirectory), not a per-project repo. REPLACE with your actual repo before applying."
   type        = string
-  default     = "YOUR_GH_ORG/YOUR_REPO"
+  default     = "aumair658/projects"
 }
 
 variable "create_oidc_provider" {
   description = "Whether to create the GitHub Actions OIDC provider. AWS allows only one OIDC provider per URL per account, so set this to false if your account already has token.actions.githubusercontent.com registered (check IAM > Identity providers first)."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "role_name" {

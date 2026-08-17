@@ -14,6 +14,10 @@ in `.github/workflows/`.
   GitHub App + AWS Lambda (Function URL) that runs tfsec against the
   changed `.tf` files on a PR and comments the findings. Deployed by hand
   (see its README), not via a repo-root CI workflow.
+- [`aws-tf-mcp/`](aws-tf-mcp/README.md) — a learning project building an
+  MCP server in the AWS/Terraform space, staged from a simple local
+  file-parsing tool up to live AWS calls and Terraform CLI integration.
+  No CI/CD; run locally with the MCP Inspector.
 
 ## Conventions for adding a new project
 

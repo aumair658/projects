@@ -142,6 +142,17 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "s3:GetBucketPolicy",
       "s3:GetBucketAcl",
       "s3:ListBucket",
+      # The AWS provider reads these as part of every aws_s3_bucket
+      # refresh (to populate legacy computed attributes), even though
+      # this fixture never sets them.
+      "s3:GetBucketCORS",
+      "s3:GetBucketWebsite",
+      "s3:GetBucketLogging",
+      "s3:GetLifecycleConfiguration",
+      "s3:GetBucketRequestPayment",
+      "s3:GetAccelerateConfiguration",
+      "s3:GetReplicationConfiguration",
+      "s3:GetBucketObjectLockConfiguration",
     ]
     resources = ["*"]
   }
@@ -157,6 +168,12 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "iam:PutRolePolicy",
       "iam:DeleteRolePolicy",
       "iam:GetRolePolicy",
+      # The AWS provider reads these as part of every aws_iam_role
+      # refresh to detect drift, even though Terraform is the sole
+      # manager of this role's policies.
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
       "iam:CreateInstanceProfile",
       "iam:DeleteInstanceProfile",
       "iam:GetInstanceProfile",

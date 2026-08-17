@@ -7,10 +7,13 @@ in `.github/workflows/`.
 ## Projects
 
 - [`tf_pr_reviewer/`](tf_pr_reviewer/README.md) — Terraform test fixture
-  (S3 bucket, security group, IAM role, EC2 instance) used to exercise a
-  Terraform PR-review bot. Deploys via
-  `.github/workflows/tf_pr_reviewer-terraform.yml`: PRs plan, merges to
-  `main` apply.
+  (S3 bucket, security group) used to exercise a Terraform PR-review bot.
+  Deploys via `.github/workflows/tf_pr_reviewer-terraform.yml`: PRs plan,
+  merges to `main` apply.
+- [`tf_pr_bot/`](tf_pr_bot/README.md) — the PR-review bot itself: a
+  GitHub App + AWS Lambda (Function URL) that runs tfsec against the
+  changed `.tf` files on a PR and comments the findings. Deployed by hand
+  (see its README), not via a repo-root CI workflow.
 
 ## Conventions for adding a new project
 

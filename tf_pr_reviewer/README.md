@@ -5,8 +5,10 @@ Terraform PR-review bot. It provisions:
 
 - An S3 bucket (`s3.tf`)
 - A security group (`security_group.tf`)
-- An IAM role + instance profile for EC2 (`iam.tf`)
-- An EC2 instance (`ec2.tf`)
+
+No EC2 instance is provisioned — it was removed to avoid ongoing compute
+cost; the security group exists standalone purely to carry its intentional
+finding below.
 
 ## Intentional issues
 
@@ -21,9 +23,8 @@ concrete to catch:
    on `aws_security_group.app_sg` opens SSH (port 22) to `0.0.0.0/0`.
 
 Both are marked inline with `INTENTIONAL FINDING` comments. Everything else
-in the stack (versioning, least-privilege IAM policy scoped to the bucket,
-egress rule, instance profile) is written to be reasonably clean so the
-review bot's signal isn't drowned out by unrelated noise.
+in the stack (versioning, egress rule) is written to be reasonably clean so
+the review bot's signal isn't drowned out by unrelated noise.
 
 ## Repo layout: this project lives inside a monorepo
 
@@ -66,9 +67,9 @@ It's scoped with a `paths:` filter so it only triggers on changes under
    backend, commit `backend.tf`, and push. From then on, PRs plan and
    merges to `main` apply — no one needs to run `terraform apply` locally.
 
-You'll also need to supply `vpc_id` and `subnet_id` (e.g. as GitHub Actions
-`vars`/`tfvars`, or hardcode test values) for `plan`/`apply` to succeed
-against a real AWS account.
+You'll also need to supply `vpc_id` (e.g. as a GitHub Actions var/tfvars, or
+hardcode a test value) for `plan`/`apply` to succeed against a real AWS
+account.
 
 ### Local development
 

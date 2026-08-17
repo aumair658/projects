@@ -25,3 +25,4 @@ resource "aws_s3_bucket_versioning" "app_data" {
 # NOTE: No aws_s3_bucket_server_side_encryption_configuration resource here.
 # NOTE: No aws_s3_bucket_public_access_block resource here either.
 # Both omissions are intentional so a review bot has something to catch.
+# (touched to trigger tf_pr_bot for a live test)

@@ -22,6 +22,18 @@ on:
       - "!tf_pr_reviewer/**.md"
       - ".github/workflows/tf_pr_reviewer-terraform.yml"
 
+# Two pushes to main close together (e.g. merging back-to-back PRs) each
+# queue their own plan+apply run pinned to their own commit. Without this,
+# both can sit "Waiting" on the approval gate at once, and approving the
+# older one after the newer one applies re-diffs against a stale config -
+# recreating resources the newer commit just removed. cancel-in-progress
+# kills a stale run (including one still waiting on approval) as soon as a
+# newer push for the same ref shows up, so only the latest ever reaches
+# approval.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   id-token: write      # required for OIDC AWS auth

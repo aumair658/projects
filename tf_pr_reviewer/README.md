@@ -15,9 +15,8 @@ finding below.
 Two issues are deliberately left in place so a review bot has something
 concrete to catch:
 
-1. **Unencrypted S3 bucket** (`s3.tf`) — no
-   `aws_s3_bucket_server_side_encryption_configuration` resource and no
-   `aws_s3_bucket_public_access_block` resource are attached to
+1. **Potentially public S3 bucket** (`s3.tf`) — no
+   `aws_s3_bucket_public_access_block` resource is attached to
    `aws_s3_bucket.app_data`.
 2. **Wide-open security group rule** (`security_group.tf`) — the ingress rule
    on `aws_security_group.app_sg` opens SSH (port 22) to `0.0.0.0/0`.

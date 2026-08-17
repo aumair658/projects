@@ -16,28 +16,10 @@ variable "bucket_name" {
   default     = "tf-pr-reviewer-test-bucket-change-me"
 }
 
-variable "instance_type" {
-  description = "EC2 instance type"
-  type        = string
-  default     = "t3.micro"
-}
-
-variable "ami_id" {
-  description = "AMI ID for the EC2 instance (defaults to a placeholder - override per region)"
-  type        = string
-  default     = "ami-0c101f26f147fa7fd"
-}
-
 variable "vpc_id" {
-  description = "VPC ID to launch the security group and instance into"
+  description = "VPC ID to launch the security group into"
   type        = string
   default     = "vpc-07a8ae898e0badacd"
-}
-
-variable "subnet_id" {
-  description = "Subnet ID to launch the EC2 instance into"
-  type        = string
-  default     = "subnet-0314bcd1a4f9797cf"
 }
 
 variable "tags" {

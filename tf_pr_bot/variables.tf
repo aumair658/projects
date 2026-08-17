@@ -13,7 +13,7 @@ variable "function_name" {
 variable "github_app_id" {
   description = "GitHub App ID (not sensitive - shown on the app's settings page). Set after registering the app."
   type        = string
-  default     = "REPLACE_WITH_APP_ID"
+  default     = "4626886"
 }
 
 variable "log_retention_days" {

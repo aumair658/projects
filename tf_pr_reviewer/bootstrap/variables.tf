@@ -22,6 +22,12 @@ variable "github_repo" {
   default     = "aumair658/projects"
 }
 
+variable "github_subject_claim_prefix" {
+  description = "OIDC subject (sub) claim prefix GitHub sends for this repo, without the trailing \":*\". Repos created/renamed after 2026-07-15 use GitHub's immutable subject claim format (\"repo:ORG@ORG_ID/REPO@REPO_ID\") instead of the classic \"repo:org/repo\" - copy the exact value from Settings > Actions > General > OIDC > \"Default subject claim prefix\" for this repo."
+  type        = string
+  default     = "repo:aumair658@58346411/projects@1337327941"
+}
+
 variable "create_oidc_provider" {
   description = "Whether to create the GitHub Actions OIDC provider. AWS allows only one OIDC provider per URL per account, so set this to false if your account already has token.actions.githubusercontent.com registered (check IAM > Identity providers first)."
   type        = bool

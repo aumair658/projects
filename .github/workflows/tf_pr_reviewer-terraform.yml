@@ -111,6 +111,10 @@ jobs:
     name: Apply
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Requires manual approval: the "production" environment has a
+    # required reviewer configured (Settings > Environments), so this
+    # job pauses here until someone approves the run in the Actions tab.
+    environment: production
     defaults:
       run:
         working-directory: tf_pr_reviewer

@@ -31,13 +31,13 @@ variable "ami_id" {
 variable "vpc_id" {
   description = "VPC ID to launch the security group and instance into"
   type        = string
-  default     = ""
+  default     = "vpc-07a8ae898e0badacd"
 }
 
 variable "subnet_id" {
   description = "Subnet ID to launch the EC2 instance into"
   type        = string
-  default     = ""
+  default     = "subnet-0314bcd1a4f9797cf"
 }
 
 variable "tags" {

@@ -138,3 +138,26 @@ resource "aws_lambda_function_url" "bot" {
   function_name      = aws_lambda_function.bot.function_name
   authorization_type = "NONE"
 }
+
+# authorization_type = NONE on the URL isn't sufficient by itself - Lambda
+# still enforces its resource-based policy, so anonymous invocation needs
+# these two explicit grants too. Without them, requests 403 at the Function
+# URL layer before the handler ever runs (no CloudWatch log entry, no
+# signature check - AWS rejects it, not the app). Since Oct 2025 both
+# InvokeFunctionUrl AND InvokeFunction (scoped to URL-only via
+# invoked_via_function_url) are required - one alone still 403s.
+resource "aws_lambda_permission" "url_public_invoke" {
+  statement_id           = "AllowPublicFunctionUrlInvoke"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.bot.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "url_public_invoke_function" {
+  statement_id             = "AllowPublicFunctionUrlInvokeFunction"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.bot.function_name
+  principal                = "*"
+  invoked_via_function_url = true
+}

@@ -1,0 +1,6 @@
+# Root-level ignores that apply across every project in this monorepo.
+# Project-specific ignores (Terraform state, .terraform/, etc.) live in
+# each project's own .gitignore.
+
+.DS_Store
+**/.DS_Store

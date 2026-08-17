@@ -1,0 +1,136 @@
+name: tf_pr_reviewer - Terraform
+
+# This workflow lives at the monorepo root but only triggers on changes
+# inside tf_pr_reviewer/, and only touches that subdirectory. As more
+# projects are added under projects/, give each its own workflow file here
+# following the same <project>-terraform.yml pattern with its own
+# `paths:` filter and `working-directory`.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tf_pr_reviewer/**"
+      - "!tf_pr_reviewer/bootstrap/**"
+      - "!tf_pr_reviewer/**.md"
+      - ".github/workflows/tf_pr_reviewer-terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tf_pr_reviewer/**"
+      - "!tf_pr_reviewer/bootstrap/**"
+      - "!tf_pr_reviewer/**.md"
+      - ".github/workflows/tf_pr_reviewer-terraform.yml"
+
+permissions:
+  contents: read
+  id-token: write      # required for OIDC AWS auth
+  pull-requests: write # required to post the plan as a PR comment
+
+env:
+  AWS_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+  WORKING_DIR: tf_pr_reviewer
+
+jobs:
+  plan:
+    name: Plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tf_pr_reviewer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TF_PR_REVIEWER_AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform fmt check
+        id: fmt
+        run: terraform fmt -check -diff
+        continue-on-error: true
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        id: plan
+        run: terraform plan -input=false -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Terraform show (readable plan output)
+        id: show
+        run: terraform show -no-color tfplan
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        env:
+          FMT_OUTCOME: ${{ steps.fmt.outcome }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          PLAN_STDOUT: ${{ steps.show.outputs.stdout }}
+        with:
+          script: |
+            const output = `#### tf_pr_reviewer — Terraform fmt: \`${process.env.FMT_OUTCOME}\`
+            #### tf_pr_reviewer — Terraform plan: \`${process.env.PLAN_OUTCOME}\`
+
+            <details><summary>Show plan</summary>
+
+            \`\`\`terraform
+            ${process.env.PLAN_STDOUT}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: \`${{ github.event_name }}\` on \`${{ github.event.pull_request.head.sha }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  apply:
+    name: Apply
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tf_pr_reviewer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TF_PR_REVIEWER_AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        run: terraform apply -input=false -auto-approve

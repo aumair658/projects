@@ -23,9 +23,11 @@ Then call list_terraform_resources with directory="../tf_pr_reviewer"
 --- Roadmap: tools to add yourself as you learn ---
 
 1. (done) list_terraform_resources -- static file parsing, no AWS calls.
-2. list_s3_buckets -- your first live AWS call. Use boto3, and keep it
-   read-only (`s3.list_buckets()`). This is where you'll learn how
-   credentials/auth flow into an MCP server's process.
+2. (done) list_s3_buckets -- your first live AWS call, via boto3.
+   boto3 resolves credentials the same way the AWS CLI does (env vars,
+   ~/.aws/credentials, or an IAM role) -- the MCP server itself never
+   handles a key or secret directly, it just inherits whatever identity
+   the process it's running in already has.
 3. terraform_plan_summary -- shell out to `terraform plan` in a given
    directory (subprocess) and return a parsed summary of adds/changes/
    destroys. This teaches wrapping an external CLI tool as an MCP tool,
@@ -38,6 +40,7 @@ shape of list_terraform_resources and go from there.
 import re
 from pathlib import Path
 
+import boto3
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("aws-tf-mcp")
@@ -67,6 +70,22 @@ def list_terraform_resources(directory: str) -> list[str]:
         for resource_type, resource_name in _RESOURCE_RE.findall(text):
             resources.append(f"{resource_type}.{resource_name}")
     return resources
+
+
+@mcp.tool()
+def list_s3_buckets() -> list[str]:
+    """List the names of all S3 buckets in the AWS account.
+
+    Read-only: calls the S3 ListBuckets API. Uses whatever AWS
+    credentials boto3 finds in the environment (same resolution order
+    as the AWS CLI: env vars, ~/.aws/credentials, then an IAM role).
+
+    Returns:
+        A list of bucket names, e.g. ["my-app-data", "my-logs"].
+    """
+    s3 = boto3.client("s3")
+    response = s3.list_buckets()
+    return [bucket["Name"] for bucket in response["Buckets"]]
 
 
 if __name__ == "__main__":

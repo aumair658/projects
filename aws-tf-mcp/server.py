@@ -40,6 +40,11 @@ Then call list_terraform_resources with directory="../tf_pr_reviewer"
    by URI (discovered via resources/list, fetched via resources/read)
    -- no arguments, no "invocation". `@mcp.resource(uri)` is the
    decorator, mirroring `@mcp.tool()`.
+5. (done) tfsec_scan -- shell out to `tfsec` (subprocess), same
+   pattern as terraform_plan_summary. No new MCP concept here -- the
+   point is reusing an existing CLI-wrapping tool (tf_pr_bot's Lambda
+   handler runs the exact same tfsec invocation against PR diffs) as
+   a callable MCP tool instead of a webhook-triggered scan.
 
 Each new tool is just another `@mcp.tool()` function below -- copy the
 shape of list_terraform_resources and go from there.
@@ -279,6 +284,60 @@ def aws_resource_inventory() -> dict[str, list[str]]:
         "service:resource-type" label to a list of resource ARNs.
     """
     return list_all_resources_by_type()
+
+
+@mcp.tool()
+def tfsec_scan(directory: str) -> list[dict]:
+    """Run tfsec against a directory and return its security findings.
+
+    Read-only static analysis: tfsec only reads .tf files, it never
+    touches real infrastructure or needs AWS credentials -- same shape
+    as list_terraform_resources (local file analysis) but flagging
+    security issues instead of just inventorying resources. Requires
+    the tfsec CLI to be installed and on PATH.
+
+    This is the same tfsec invocation (`--format json --soft-fail`)
+    that tf_pr_bot's Lambda handler runs against PR diffs -- see
+    `_run_tfsec()` in tf_pr_bot/lambda/handler.py -- wrapped as a
+    tool here instead of a webhook-triggered scan.
+
+    Args:
+        directory: Path to a directory containing .tf files (e.g.
+            "../tf_pr_reviewer").
+
+    Returns:
+        A list of findings, each a dict with "rule_id", "resource",
+        "severity", "description", "file", and "line". Empty list if
+        tfsec finds nothing.
+    """
+    root = Path(directory)
+    if not root.is_dir():
+        raise ValueError(f"not a directory: {directory}")
+
+    result = subprocess.run(
+        ["tfsec", str(root), "--format", "json", "--soft-fail"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"tfsec failed:\n{result.stderr or result.stdout}")
+    if not result.stdout.strip():
+        return []
+
+    parsed = json.loads(result.stdout)
+    findings = []
+    for f in parsed.get("results") or []:
+        location = f.get("location", {})
+        findings.append({
+            "rule_id": f.get("rule_id", ""),
+            "resource": f.get("resource", ""),
+            "severity": f.get("severity", ""),
+            "description": f.get("description", ""),
+            "file": location.get("filename", ""),
+            "line": location.get("start_line", ""),
+        })
+    return findings
 
 
 if __name__ == "__main__":

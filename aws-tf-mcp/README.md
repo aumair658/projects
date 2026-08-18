@@ -49,6 +49,12 @@ plain function into a tool or a resource with one decorator each --
   but read directly by URI instead of invoked with arguments. Exists
   to demonstrate MCP's other primitive using data you already
   understand, not to add new functionality.
+- `tfsec_scan` -- shells out to `tfsec` (same `--format json
+  --soft-fail` invocation [`tf_pr_bot`](../tf_pr_bot/README.md)'s
+  Lambda handler runs) and returns findings as a list of dicts with
+  `rule_id`/`resource`/`severity`/`description`/`file`/`line`. No AWS
+  needed -- tfsec is a static analyzer, same "local file, no
+  credentials" shape as `list_terraform_resources`.
 
 ## Running it
 
@@ -95,6 +101,10 @@ build each tool:
   `server.terraform_plan_summary('../tf_pr_reviewer')` (needs
   `tf_pr_reviewer` to already be `terraform init`-ed) or
   `server.list_all_resources_by_type()`.
+- **`tfsec_scan`** needs no AWS creds either, just the `tfsec` CLI on
+  PATH: `server.tfsec_scan('../tf_pr_reviewer')` should return 9
+  findings, including the two `INTENTIONAL FINDING`s called out in
+  that project's README.
 - **The Resource, not a tool** -- `read_resource`/`list_resources` are
   async and go through `server.mcp`, not the plain function call above:
   ```bash
@@ -148,7 +158,9 @@ what each teaches is in the docstring at the top of `server.py`.
    `list_all_resources_by_type` (reused directly), but read by URI
    instead of called with arguments -- the concept being learned here
    is the tool-vs-resource distinction, not new data.
-
-From there, a natural next step: tying `tf_pr_bot`'s tfsec scan in as
-a callable tool, the same "wrap a CLI tool" pattern used for
-`terraform_plan_summary`.
+5. **Done** -- `tfsec_scan`: shells out to `tfsec` (subprocess), the
+   same pattern as `terraform_plan_summary`. No new MCP concept here --
+   the point is wrapping `tf_pr_bot`'s existing scan (its Lambda
+   handler runs the identical `tfsec ... --format json --soft-fail`
+   invocation against PR diffs) as a callable tool instead of a
+   webhook-triggered one.

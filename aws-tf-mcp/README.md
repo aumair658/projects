@@ -67,6 +67,21 @@ To connect it to Claude Code instead of the Inspector, add it as a local
 MCP server pointing at `server.py` (see `claude mcp add` docs) once
 you've got it running standalone first.
 
+## CI
+
+`../.github/workflows/aws-tf-mcp-smoke-test.yml` (monorepo root -- GitHub
+only reads workflows from there, not per-subdirectory) runs on every
+push/PR touching this project: installs `requirements.txt` into a clean
+venv and does `python -c "import server"`. There's no test suite yet, so
+this is just an import smoke test -- enough to catch a syntax error, a
+missing/renamed dependency, or a broken `@mcp.tool()` decorator before
+merge. It needs no AWS/Terraform credentials since none of that runs at
+import time, only when a tool is actually called.
+
+The repo-wide `security-scan.yml` (Trivy + Bandit, see the root README)
+also covers this project automatically, for CVEs/secrets/IaC issues
+rather than "does it still run."
+
 ## Roadmap -- build these next as you learn
 
 Each step is deliberately a small jump from the last. Full detail on

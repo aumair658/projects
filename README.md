@@ -17,7 +17,10 @@ in `.github/workflows/`.
 - [`aws-tf-mcp/`](aws-tf-mcp/README.md) — a learning project building an
   MCP server in the AWS/Terraform space, staged from a simple local
   file-parsing tool up to live AWS calls and Terraform CLI integration.
-  No CI/CD; run locally with the MCP Inspector.
+  Run locally with the MCP Inspector. CI via
+  `.github/workflows/aws-tf-mcp-smoke-test.yml`: installs deps and
+  imports `server.py` on every push/PR touching the project (no test
+  suite yet, so this just catches import-breaking errors).
 
 ## Security
 

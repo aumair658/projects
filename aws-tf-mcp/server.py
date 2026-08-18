@@ -34,6 +34,12 @@ Then call list_terraform_resources with directory="../tf_pr_reviewer"
    text. This is the same pattern tools like Atlantis/Terraform Cloud
    use, and it's more robust than text-scraping since the JSON schema
    is stable across Terraform versions where wording isn't.
+4. (done) aws-resources:// -- MCP's other primitive: a Resource.
+   Tools are functions a client *calls*, with arguments, to perform an
+   action. Resources are read-only content a client *reads* directly
+   by URI (discovered via resources/list, fetched via resources/read)
+   -- no arguments, no "invocation". `@mcp.resource(uri)` is the
+   decorator, mirroring `@mcp.tool()`.
 
 Each new tool is just another `@mcp.tool()` function below -- copy the
 shape of list_terraform_resources and go from there.
@@ -254,6 +260,25 @@ def terraform_plan_summary(directory: str) -> dict:
         raise RuntimeError("terraform plan produced no change_summary event")
 
     return {"summary": summary, **report}
+
+
+@mcp.resource("aws-resources://by-type")
+def aws_resource_inventory() -> dict[str, list[str]]:
+    """The AWS account's tagged resources, grouped by type -- as a Resource.
+
+    Same data and same read-only Resource Groups Tagging API call as
+    the list_all_resources_by_type tool above (reused directly, no
+    duplicated logic) -- the point isn't new data, it's the other MCP
+    primitive: a client reads this by URI (aws-resources://by-type)
+    rather than calling it with arguments. Good fit for a Resource
+    since the underlying data already takes no parameters and has no
+    side effects -- exactly what Resources are meant for.
+
+    Returns:
+        Same shape as list_all_resources_by_type(): a dict mapping a
+        "service:resource-type" label to a list of resource ARNs.
+    """
+    return list_all_resources_by_type()
 
 
 if __name__ == "__main__":

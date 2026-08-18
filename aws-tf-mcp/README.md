@@ -8,15 +8,18 @@ each stage introducing one new concept.
 
 ## What's an MCP server, briefly
 
-An MCP server is a small process that exposes **tools** (functions) an AI
-client -- Claude, in this case -- can discover and call. The client sends
-a request, the server runs the matching Python function, and the result
-goes back to the client as the tool's output. That's the whole loop:
-discover tools -> call a tool -> get a result. Everything else (resources,
-prompts, auth) builds on top of that.
+An MCP server is a small process that exposes **tools** (functions) and
+**resources** (read-only content addressed by URI) that an AI client --
+Claude, in this case -- can discover and use. For a tool, the client sends
+a request with arguments, the server runs the matching Python function,
+and the result goes back as the tool's output. For a resource, the client
+just reads it directly by URI -- no arguments, no "invocation", since it's
+meant to be read-only content rather than an action. Everything else
+(prompts, auth) builds on top of these two.
 
 This project uses the official Python SDK's `FastMCP`, which turns a
-plain function into a tool with one decorator -- see `server.py`.
+plain function into a tool or a resource with one decorator each --
+`@mcp.tool()` / `@mcp.resource(uri)` -- see `server.py`.
 
 ## What's here now
 
@@ -41,6 +44,11 @@ plain function into a tool with one decorator -- see `server.py`.
   "read": [], "replace": []}`. Read-only (a plan never applies), but
   needs both a real Terraform init and reachable AWS credentials since
   it refreshes state against the live account.
+- `aws-resources://by-type` -- a **Resource**, not a tool: the same
+  data as `list_all_resources_by_type` (it just calls that function),
+  but read directly by URI instead of invoked with arguments. Exists
+  to demonstrate MCP's other primitive using data you already
+  understand, not to add new functionality.
 
 ## Running it
 
@@ -101,7 +109,12 @@ what each teaches is in the docstring at the top of `server.py`.
    human-readable text. Same pattern tools like Atlantis/Terraform
    Cloud use, and stable across Terraform versions where the text
    wording isn't.
+4. **Done** -- `aws-resources://by-type`: MCP's other primitive, a
+   Resource. Same underlying data and API call as
+   `list_all_resources_by_type` (reused directly), but read by URI
+   instead of called with arguments -- the concept being learned here
+   is the tool-vs-resource distinction, not new data.
 
-From there, natural next steps once the basics feel solid: a resource
-(not just tools) exposing read-only state, or tying this into
-`tf_pr_bot`'s tfsec scan as a callable tool.
+From there, a natural next step: tying `tf_pr_bot`'s tfsec scan in as
+a callable tool, the same "wrap a CLI tool" pattern used for
+`terraform_plan_summary`.

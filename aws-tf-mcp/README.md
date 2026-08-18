@@ -28,7 +28,9 @@ see actually work end to end.
 ## Running it
 
 ```bash
-python3 -m venv .venv
+cd aws-tf-mcp
+rm -rf .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 mcp dev server.py

@@ -1,0 +1,39 @@
+name: aws-tf-mcp - Smoke test
+
+# This is a learning project with no test suite yet, so "CI" here just
+# means: install requirements.txt into a clean venv and import server.py.
+# That's enough to catch a syntax error, a missing/renamed dependency, or
+# a broken @mcp.tool() decorator before it's merged -- module-level code
+# in server.py never calls AWS or Terraform, so this needs no credentials
+# and no live infra.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "aws-tf-mcp/**"
+      - "!aws-tf-mcp/**.md"
+      - ".github/workflows/aws-tf-mcp-smoke-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "aws-tf-mcp/**"
+      - "!aws-tf-mcp/**.md"
+      - ".github/workflows/aws-tf-mcp-smoke-test.yml"
+
+jobs:
+  import-check:
+    name: Install deps and import server.py
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aws-tf-mcp
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Import server.py
+        run: python -c "import server"

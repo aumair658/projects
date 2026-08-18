@@ -82,3 +82,20 @@ terraform plan
 
 `init`/`validate` work without a configured backend or AWS credentials;
 `plan`/`apply` need both.
+
+## Testing
+
+This fixture isn't tested in isolation - it's verified through what
+consumes it:
+
+- **`terraform validate`** (see above) catches config errors, but
+  doesn't know about the intentional findings - it's a syntax/type
+  check, not a security scan.
+- **The two intentional findings actually get caught** by running
+  [`tf_pr_bot`](../tf_pr_bot/README.md)'s scanner against this
+  directory - see its README's "Testing" section for the exact tfsec
+  command and expected output.
+- **The CI pipeline itself** - open a PR touching a file here and
+  confirm `../.github/workflows/tf_pr_reviewer-terraform.yml` posts a
+  plan comment (see "Deploying" above); merging to `main` should then
+  apply cleanly.

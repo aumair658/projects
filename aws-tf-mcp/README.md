@@ -75,6 +75,40 @@ To connect it to Claude Code instead of the Inspector, add it as a local
 MCP server pointing at `server.py` (see `claude mcp add` docs) once
 you've got it running standalone first.
 
+## Testing
+
+There's no automated test suite (see CI below for what does run
+automatically) -- this project is meant to be exercised by hand as you
+build each tool:
+
+- **No AWS needed**: `list_terraform_resources` is the one tool that
+  makes no network calls, so it's the fastest way to confirm the
+  server itself is wired up right:
+  ```bash
+  .venv/bin/python3 -c "
+  import server
+  print(server.list_terraform_resources('../tf_pr_reviewer'))
+  "
+  ```
+  Should print the 4 resources in `tf_pr_reviewer`'s `.tf` files.
+- **With AWS creds**: same pattern for the rest, e.g.
+  `server.terraform_plan_summary('../tf_pr_reviewer')` (needs
+  `tf_pr_reviewer` to already be `terraform init`-ed) or
+  `server.list_all_resources_by_type()`.
+- **The Resource, not a tool** -- `read_resource`/`list_resources` are
+  async and go through `server.mcp`, not the plain function call above:
+  ```bash
+  .venv/bin/python3 -c "
+  import asyncio, server
+  print(asyncio.run(server.mcp.list_resources()))
+  print(asyncio.run(server.mcp.read_resource('aws-resources://by-type')))
+  "
+  ```
+- **Full protocol, interactively**: `mcp dev server.py` (see "Running
+  it" above) -- the Inspector lets you call every tool/resource through
+  the actual MCP client/server loop, not just the underlying Python
+  function.
+
 ## CI
 
 `../.github/workflows/aws-tf-mcp-smoke-test.yml` (monorepo root -- GitHub

@@ -20,17 +20,27 @@ plain function into a tool with one decorator -- see `server.py`.
 
 ## What's here now
 
-Two tools:
-
 - `list_terraform_resources` -- reads `.tf` files in a directory and
   regex-extracts `resource "type" "name"` blocks. No network or AWS
   calls, so it's the simplest possible thing to run and see actually
   work end to end.
-- `list_s3_buckets` -- calls `s3:ListBuckets` via `boto3` and returns
-  the bucket names in your AWS account. Your first tool that talks to
-  a real cloud API instead of local files. Read-only, and it doesn't
-  take any credentials as arguments -- boto3 finds them itself (see
-  the docstring in `server.py` for the resolution order).
+- `list_s3_buckets`, `list_lambda_functions`, `list_ec2` -- each calls
+  one AWS service's own read-only list/describe API via `boto3` and
+  returns the resource names/IDs. Credentials aren't passed as
+  arguments -- boto3 finds them itself (see the docstring in
+  `server.py` for the resolution order).
+- `list_all_resources_by_type` -- calls the Resource Groups Tagging
+  API once and groups every tagged resource by `service:resource-type`.
+  Broader than the per-service tools above, but only sees resources
+  that are (or were recently) tagged.
+- `terraform_plan_summary` -- shells out to `terraform plan -json` in
+  an already-`init`-ed directory and parses the streamed JSON-lines
+  output into resource addresses grouped by planned action, e.g.
+  `{"summary": "Plan: 1 to add, 1 to change, 0 to destroy.",
+  "add": ["aws_s3_bucket.new"], "change": [...], "destroy": [],
+  "read": [], "replace": []}`. Read-only (a plan never applies), but
+  needs both a real Terraform init and reachable AWS credentials since
+  it refreshes state against the live account.
 
 ## Running it
 
@@ -68,11 +78,15 @@ what each teaches is in the docstring at the top of `server.py`.
    Read-only, and shows how credentials reach a process that isn't the
    AWS CLI (boto3 uses the same env-vars / `~/.aws/credentials` / IAM
    role resolution order the CLI does).
-3. **Next** -- `terraform_plan_summary`: shell out to
-   `terraform plan` with `subprocess` and parse its output. This is the
-   same "wrap a CLI tool as an MCP tool" pattern real infra-focused MCP
-   servers use.
+3. **Done** -- `terraform_plan_summary`: shells out to
+   `terraform plan -json` with `subprocess` and parses the streamed
+   JSON-lines output -- each resource's planned action is its own
+   "planned_change" event -- into resource addresses grouped by
+   add/change/destroy/read/replace, rather than regexing the
+   human-readable text. Same pattern tools like Atlantis/Terraform
+   Cloud use, and stable across Terraform versions where the text
+   wording isn't.
 
-From there, natural next steps once the basics feel solid: multiple AWS
-services, a resource (not just tools) exposing read-only state, or
-tying this into `tf_pr_bot`'s tfsec scan as a callable tool.
+From there, natural next steps once the basics feel solid: a resource
+(not just tools) exposing read-only state, or tying this into
+`tf_pr_bot`'s tfsec scan as a callable tool.

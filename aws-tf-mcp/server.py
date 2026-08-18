@@ -28,16 +28,20 @@ Then call list_terraform_resources with directory="../tf_pr_reviewer"
    ~/.aws/credentials, or an IAM role) -- the MCP server itself never
    handles a key or secret directly, it just inherits whatever identity
    the process it's running in already has.
-3. terraform_plan_summary -- shell out to `terraform plan` in a given
-   directory (subprocess) and return a parsed summary of adds/changes/
-   destroys. This teaches wrapping an external CLI tool as an MCP tool,
-   which is the same pattern real infra tools use.
+3. (done) terraform_plan_summary -- shell out to `terraform plan -json`
+   (subprocess) and parse the streamed JSON-lines output for the one
+   "change_summary" event, rather than regexing the human-readable
+   text. This is the same pattern tools like Atlantis/Terraform Cloud
+   use, and it's more robust than text-scraping since the JSON schema
+   is stable across Terraform versions where wording isn't.
 
 Each new tool is just another `@mcp.tool()` function below -- copy the
 shape of list_terraform_resources and go from there.
 """
 
+import json
 import re
+import subprocess
 from pathlib import Path
 
 import boto3
@@ -175,6 +179,81 @@ def list_all_resources_by_type() -> dict[str, list[str]]:
             grouped.setdefault(resource_type, []).append(arn)
 
     return grouped
+
+
+# Terraform's plan action names, grouped into the buckets we report.
+# "create-then-delete"/"delete-then-create" are both a replace (the
+# resource can't be updated in place, so Terraform destroys and
+# recreates it); "no-op" resources are left out of the report entirely
+# since nothing is actually changing for them.
+_PLAN_ACTION_BUCKETS = {
+    "create": "add",
+    "update": "change",
+    "delete": "destroy",
+    "read": "read",
+    "create-then-delete": "replace",
+    "delete-then-create": "replace",
+}
+
+
+@mcp.tool()
+def terraform_plan_summary(directory: str) -> dict:
+    """Run `terraform plan` in a directory and list what it would change.
+
+    Read-only: `terraform plan` only compares the .tf config against
+    real infrastructure state, it never applies anything. The
+    directory must already be `terraform init`-ed (this tool doesn't
+    init it for you), and needs reachable AWS credentials since a real
+    plan refreshes state against the live account -- same credential
+    resolution as list_s3_buckets/list_ec2/etc. above.
+
+    Parses `terraform plan -json`'s streamed output rather than the
+    human-readable text: Terraform emits one JSON object per line, and
+    each resource's planned action shows up as its own "planned_change"
+    event (with a "change_summary" event at the end totaling them up)
+    -- the same events Atlantis/Terraform Cloud key off of, and more
+    stable across Terraform versions than scraping the "Plan: N to
+    add, ..." text line or trying to grep it yourself.
+
+    Args:
+        directory: Path to an already-`terraform init`-ed directory
+            (e.g. "../tf_pr_reviewer").
+
+    Returns:
+        A dict like {"summary": "Plan: 1 to add, 1 to change, 0 to
+        destroy.", "add": ["aws_s3_bucket.new"], "change": [...],
+        "destroy": [], "read": [], "replace": []} -- resource
+        addresses grouped by planned action.
+    """
+    root = Path(directory)
+    if not root.is_dir():
+        raise ValueError(f"not a directory: {directory}")
+
+    result = subprocess.run(
+        ["terraform", "plan", "-json", "-no-color", "-input=false"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"terraform plan failed:\n{result.stderr or result.stdout}")
+
+    report: dict[str, list[str]] = {bucket: [] for bucket in ("add", "change", "destroy", "read", "replace")}
+    summary = ""
+    for line in result.stdout.splitlines():
+        event = json.loads(line)
+        event_type = event.get("type")
+        if event_type == "planned_change":
+            bucket = _PLAN_ACTION_BUCKETS.get(event["change"]["action"])
+            if bucket:
+                report[bucket].append(event["change"]["resource"]["addr"])
+        elif event_type == "change_summary":
+            summary = event.get("@message", "")
+
+    if not summary:
+        raise RuntimeError("terraform plan produced no change_summary event")
+
+    return {"summary": summary, **report}
 
 
 if __name__ == "__main__":

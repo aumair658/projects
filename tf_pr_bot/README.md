@@ -106,6 +106,29 @@ file - e.g. a PR against `tf_pr_reviewer/s3.tf` in this monorepo. Within
 a few seconds you should see a comment from the bot listing tfsec's
 findings (or a clean-scan confirmation if there aren't any).
 
+## Testing
+
+No unit test suite - the fastest way to check the actual scan logic
+without deploying anything is to run tfsec exactly the way
+`_run_tfsec()` in `lambda/handler.py` does, straight against the fixture
+it's meant to catch:
+
+```bash
+tfsec ../tf_pr_reviewer --format json --soft-fail
+```
+
+Should include (among others) `AVD-AWS-0107` (open security group
+ingress) and `AVD-AWS-0086`/`0087`/`0091`/`0093`/`0094` (missing S3
+public access block) - the two `INTENTIONAL FINDING`s called out in
+`tf_pr_reviewer/README.md`. tfsec surfaces more than just those two
+(e.g. missing bucket logging, no customer-managed key) since it scans
+everything in the directory, not just the marked issues.
+
+For the full pipeline (webhook -> JWT -> tfsec -> PR comment), see
+"Trying it" above - that's the only way to exercise the Lambda handler
+end to end short of invoking it locally with a synthetic GitHub webhook
+event.
+
 ## Local development
 
 ```bash

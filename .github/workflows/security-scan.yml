@@ -1,0 +1,52 @@
+name: security-scan
+
+# Repo-wide vulnerability gate: runs on every PR into main (and on main
+# itself, for defense in depth) so nothing merges with a known-CVE
+# dependency, an IaC misconfiguration, or a committed secret. Applies to
+# every project in this monorepo, not just one -- add a new project and
+# it's covered automatically, no changes needed here.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  trivy:
+    name: Trivy (dependency CVEs, IaC misconfig, secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned to a commit SHA (not just the v0.36.0 tag) since this is
+      # a third-party action doing security enforcement -- tags are
+      # mutable, SHAs aren't.
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,config,secret
+          # tf_pr_reviewer/ intentionally contains two vulnerable
+          # resources (see the "INTENTIONAL FINDING" comments in its
+          # s3.tf and security_group.tf) -- it's a fixture tf_pr_bot's
+          # tests scan against, not real infrastructure. Without this
+          # exclusion, every PR in the whole repo would fail forever.
+          skip-dirs: tf_pr_reviewer
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          format: table
+
+  bandit:
+    name: Bandit (Python static analysis)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install Bandit
+        run: pip install bandit
+      - name: Run Bandit
+        run: bandit -r . -x './**/.venv,./**/venv,./**/node_modules' -ll

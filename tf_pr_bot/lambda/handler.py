@@ -271,7 +271,10 @@ def _api_request(method: str, url: str, token: str, body: dict | None = None):
         req.add_header("Content-Type", "application/json")
 
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        # B310: host is the fixed GITHUB_API constant; only the path is
+        # built from GitHub App webhook data, so this isn't attacker-
+        # controlled the way a generic urlopen audit assumes.
+        with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
             raw = resp.read()
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:

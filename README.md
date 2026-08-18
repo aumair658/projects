@@ -19,6 +19,22 @@ in `.github/workflows/`.
   file-parsing tool up to live AWS calls and Terraform CLI integration.
   No CI/CD; run locally with the MCP Inspector.
 
+## Security
+
+Every PR into `main` (and every push to `main`) runs
+[`.github/workflows/security-scan.yml`](.github/workflows/security-scan.yml),
+which is repo-wide by design — it covers every project here automatically,
+not just the one being changed:
+
+- **Trivy** scans for known-CVE dependencies, Terraform misconfigurations,
+  and committed secrets (`tf_pr_reviewer/` is excluded from this scan — it
+  intentionally contains two vulnerable resources as a fixture for
+  `tf_pr_bot`, not real infrastructure).
+- **Bandit** statically checks Python code for common security issues.
+
+GitHub's native secret scanning, push protection, and Dependabot security
+updates are also enabled on the repo itself (Settings → Code security).
+
 ## Conventions for adding a new project
 
 1. Create `projects/<name>/` with the project's own code and README.

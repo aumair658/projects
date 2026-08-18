@@ -20,10 +20,17 @@ plain function into a tool with one decorator -- see `server.py`.
 
 ## What's here now
 
-One tool, `list_terraform_resources`, which reads `.tf` files in a
-directory and regex-extracts `resource "type" "name"` blocks. It makes
-no network or AWS calls, so it's the simplest possible thing to run and
-see actually work end to end.
+Two tools:
+
+- `list_terraform_resources` -- reads `.tf` files in a directory and
+  regex-extracts `resource "type" "name"` blocks. No network or AWS
+  calls, so it's the simplest possible thing to run and see actually
+  work end to end.
+- `list_s3_buckets` -- calls `s3:ListBuckets` via `boto3` and returns
+  the bucket names in your AWS account. Your first tool that talks to
+  a real cloud API instead of local files. Read-only, and it doesn't
+  take any credentials as arguments -- boto3 finds them itself (see
+  the docstring in `server.py` for the resolution order).
 
 ## Running it
 
@@ -57,10 +64,11 @@ what each teaches is in the docstring at the top of `server.py`.
 
 1. **Done** -- `list_terraform_resources`: static file parsing, the
    `@mcp.tool()` basics, no external dependencies.
-2. **Next** -- `list_s3_buckets`: your first live AWS call via `boto3`
-   (`pip install boto3` first). Keep it read-only. This is where you'll
-   run into how AWS credentials reach a process that isn't the AWS CLI.
-3. **After that** -- `terraform_plan_summary`: shell out to
+2. **Done** -- `list_s3_buckets`: your first live AWS call via `boto3`.
+   Read-only, and shows how credentials reach a process that isn't the
+   AWS CLI (boto3 uses the same env-vars / `~/.aws/credentials` / IAM
+   role resolution order the CLI does).
+3. **Next** -- `terraform_plan_summary`: shell out to
    `terraform plan` with `subprocess` and parse its output. This is the
    same "wrap a CLI tool as an MCP tool" pattern real infra-focused MCP
    servers use.

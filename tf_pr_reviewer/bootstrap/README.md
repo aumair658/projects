@@ -50,7 +50,12 @@ Take the three outputs and wire them in:
   project name since other projects in the monorepo will get their own
   roles/variables later. It doesn't need to be a secret since a role ARN
   isn't sensitive on its own, but a secret works too if you'd rather keep
-  it out of logs.
+  it out of logs. This is the **apply** role: it only trusts jobs that
+  declare the `production` environment, so every apply passes the
+  required-reviewer gate.
+- `github_actions_plan_role_arn` → repo variable
+  `TF_PR_REVIEWER_AWS_PLAN_ROLE_ARN`. This is the **read-only plan** role,
+  which only trusts `pull_request` runs.
 
 Then run `terraform init` again in `tf_pr_reviewer/` (not the monorepo
 root - Terraform only operates on the directory you run it from) to

@@ -80,8 +80,11 @@ D, and WAF, if abuse or cost becomes a concern.
   CloudFront request. The bucket policy has to reference the distribution
   ARN, which creates a Terraform ordering dependency (distribution → bucket
   policy) that Terraform handles naturally. tfsec/checkov will still flag
-  "no WAF", "no access logging" and "no CMK" on CloudFront and S3. Add
-  explicit, commented suppressions explaining the cost rationale.
+  "no WAF" and "no CMK" on CloudFront and S3. Add explicit, commented
+  suppressions explaining the cost rationale. CloudFront access logging is
+  **on** (owner decision 2026-10-28) and goes to a separate
+  `aws-resume-cf-logs-<account-id>` bucket with 30-day expiry, so that check
+  passes without a suppression.
 - **WAF deferred:** a WAF web ACL costs at least $5/month while idle. The
   trigger to add it is sustained abuse visible in the budget alert or in
   API Gateway metrics.

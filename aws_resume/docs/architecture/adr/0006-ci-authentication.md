@@ -78,9 +78,10 @@ named `aws-resume-*`. It may not modify its own role, the boundary policy
 or the other CI roles. `iam:PassRole` is limited to `aws-resume-*` roles,
 with `iam:PassedToService = lambda.amazonaws.com`.
 
-**GitHub side:** three Environments (`aws-resume-prod-infra` with a required
-reviewer, plus `-backend` and `-frontend`), each limited to the `main`
-branch. Role ARNs are stored as **repository variables**
+**GitHub side:** three Environments (`aws-resume-prod-infra`, `-backend` and
+`-frontend`), each limited to the `main` branch and each with the owner as
+a **required reviewer** (owner decision 2026-10-28: approval on all three
+pipelines). The repo is public, so environment protection rules are free. Role ARNs are stored as **repository variables**
 (`AWS_RESUME_INFRA_PLAN_ROLE_ARN`, and so on), namespaced like
 `TF_PR_REVIEWER_AWS_ROLE_ARN`. Workflows set `permissions: id-token: write`
 only on the jobs that need it.

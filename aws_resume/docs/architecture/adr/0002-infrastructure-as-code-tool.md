@@ -51,8 +51,19 @@ gated apply) already assumes Terraform.
   pinned in CI through `hashicorp/setup-terraform` and in `required_version`.
 - AWS provider pinned to a major version (`~> 6.x` or whatever major is
   current at implementation time). Commit `.terraform.lock.hcl`.
-- `default_tags` on the provider: `Project = aws_resume`,
-  `ManagedBy = terraform`, `Repo = aumair658/projects`.
+- **Naming convention** (owner decision 2026-10-28): every AWS resource
+  name starts with `aws-resume-`, e.g. `aws-resume-visitor-count`,
+  `aws-resume-infra-apply`. For globally unique names (S3 buckets), append
+  the account ID: `aws-resume-site-<account-id>`. IAM policies scope access
+  by this prefix.
+- **Tagging standard:** `default_tags` on the provider, so every resource
+  gets them automatically: `Project = aws-resume`, `Environment = prod`,
+  `ManagedBy = terraform`, `Repo = aumair658/projects`. Activate `Project`
+  as a **cost allocation tag** once (in the bootstrap) so Cost Explorer and
+  the budget can filter on it. Create a Resource Group on `Project = aws-resume`
+  to see the whole stack in one place. Tags are for grouping and cost.
+  Isolation from the sibling projects in this account comes from the IAM
+  name-prefix scoping and the permissions boundary (ADR-0006), not from tags.
 - Two root configurations: `aws_resume/infra/bootstrap/` (local state, run
   once by hand) and `aws_resume/infra/` (remote state, CI only). Extract
   modules (`site`, `api`, `dns`) once the root config grows, not before.

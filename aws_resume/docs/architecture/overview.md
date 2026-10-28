@@ -64,7 +64,7 @@ flowchart LR
     CF -->|"default behaviour /*<br/>OAC (SigV4)"| S3[(S3 site bucket<br/>private, Block Public Access)]
     CF -->|"/api/* behaviour<br/>no caching"| APIGW[API Gateway<br/>HTTP API<br/>stage throttling]
     APIGW -->|invoke| L[Lambda<br/>visitor-counter<br/>Python]
-    L -->|"UpdateItem ADD count :1"| DDB[(DynamoDB table<br/>visitor_count)]
+    L -->|"UpdateItem ADD count :1"| DDB[(DynamoDB table<br/>aws-resume-visitor-count)]
     L -->|logs| CWL[CloudWatch Logs<br/>14-day retention]
 ```
 
@@ -100,8 +100,8 @@ flowchart TB
 
     PI -->|PR: fmt, validate,<br/>tfsec/checkov, plan comment| PLANROLE[[IAM role<br/>aws-resume-infra-plan<br/>read-only]]
     PI -->|merge to main +<br/>env approval| APPLYROLE[[IAM role<br/>aws-resume-infra-apply]]
-    PB -->|merge to main| BEROLE[[IAM role<br/>aws-resume-backend-deploy]]
-    PF -->|merge to main| FEROLE[[IAM role<br/>aws-resume-frontend-deploy]]
+    PB -->|merge to main +<br/>env approval| BEROLE[[IAM role<br/>aws-resume-backend-deploy]]
+    PF -->|merge to main +<br/>env approval| FEROLE[[IAM role<br/>aws-resume-frontend-deploy]]
 
     OIDC{{GitHub OIDC provider<br/>token.actions.githubusercontent.com}}
     PLANROLE -.trusts.-> OIDC
@@ -174,7 +174,7 @@ URL, so aws_resume **looks it up with a data source rather than creating it**.
 | Role | Assumable when (`sub` claim) | Permissions (summary) |
 |---|---|---|
 | `aws-resume-infra-plan` | `repo:aumair658@58346411/projects@1337327941:pull_request` | `ReadOnlyAccess`-style read on the managed services. Read on the state object. Read/write/delete **only** on the `*.tflock` lock object. No write to any resource |
-| `aws-resume-infra-apply` | `repo:aumair658@58346411/projects@1337327941:environment:aws-resume-prod-infra` (environment with required reviewer) | Create/update/delete on the stack's resources, scoped by `aws-resume-*` name prefix where the service supports it. May create IAM roles **only with the `aws-resume-boundary` permissions boundary attached** (prevents privilege escalation). State read/write |
+| `aws-resume-infra-apply` | `repo:aumair658@58346411/projects@1337327941:environment:aws-resume-prod-infra` (environment with required reviewer, as all three are) | Create/update/delete on the stack's resources, scoped by `aws-resume-*` name prefix where the service supports it. May create IAM roles **only with the `aws-resume-boundary` permissions boundary attached** (prevents privilege escalation). State read/write |
 | `aws-resume-backend-deploy` | `repo:aumair658@58346411/projects@1337327941:environment:aws-resume-prod-backend` | `lambda:UpdateFunctionCode`, `PublishVersion`, `UpdateAlias`, `GetFunction*` on **one function ARN** |
 | `aws-resume-frontend-deploy` | `repo:aumair658@58346411/projects@1337327941:environment:aws-resume-prod-frontend` | `s3:ListBucket` on the site bucket. `s3:PutObject`/`DeleteObject` on `site-bucket/*`. `cloudfront:CreateInvalidation` on **one distribution ARN** |
 | `aws-resume-visitor-counter-exec` (runtime, not CI) | `lambda.amazonaws.com` | `dynamodb:UpdateItem`/`GetItem` on one table. Logs on one log group |
@@ -190,7 +190,7 @@ copy that. See ADR-0006.
 |---|---|---|---|
 | Resume content (HTML, PDF) | **Public** | S3 site bucket, Git | Intentionally public. Take care not to commit a home address or phone number you don't want indexed |
 | Visitor count | **Public** | DynamoDB | A single integer. No PII |
-| Request logs (Lambda, API GW access logs if enabled) | **Internal** | CloudWatch Logs, 14-day retention | Can contain source IPs (personal data in some jurisdictions). Short retention, not exported |
+| Request logs (Lambda, API GW access logs, CloudFront standard logs) | **Internal** | CloudWatch Logs, 14-day retention | Can contain source IPs (personal data in some jurisdictions). Short retention, not exported |
 | Terraform state | **Confidential** | S3 state bucket | Contains resource ARNs and config, no secrets by design. Versioned, encrypted, TLS-only, no public access |
 | CI role ARNs | **Internal (non-secret)** | GitHub Actions *variables* | A role ARN on its own grants nothing. Matches the sibling-project convention |
 
@@ -225,9 +225,11 @@ state. gitleaks runs on every PR as the safety net.
 ## 5. Operability
 
 - **Logging:** Lambda logs go to CloudWatch with 14-day retention. API Gateway
-  access logs are on (JSON, 14 days). CloudFront standard logging is **off**
-  in v1 to save cost and noise. Turn it on if traffic analysis is wanted
-  (open question).
+  access logs are on (JSON, 14 days). CloudFront standard logging is **on**,
+  delivered to a private, encrypted `aws-resume-cf-logs-<account-id>` S3
+  bucket with a **30-day lifecycle expiry**. Use the newer logging delivery
+  (v2) so the log bucket doesn't need ACLs enabled. The logs contain viewer
+  IPs (personal data), so retention stays short and they are never exported.
 - **Alarms** (CloudWatch, 10 free per month): Lambda `Errors > 0` (5 min),
   Lambda `Throttles > 0`, API GW `5xx > 0`, DynamoDB
   `ThrottledRequests > 0`, CloudFront `5xxErrorRate > 5%`. CloudFront metrics
@@ -267,11 +269,12 @@ month, which is generous for a personal resume.
 | ACM public cert | free | 1 | $0.00 |
 | CloudFront | Always-free tier: 1 TB out + 10M requests/month | <1 GB, <50k req | $0.00 |
 | S3 (site + state) | ~$0.023/GB-month + requests | <50 MB | ~$0.01 |
-| API Gateway HTTP API | $1.00/M requests (1M/month free for the first 12 months on legacy-free-tier accounts) | ~5k | $0.00–$0.01 |
+| API Gateway HTTP API | $1.00/M requests (account is older than 12 months, so no API Gateway free tier) | ~5k | ~$0.01 |
 | Lambda | Always-free: 1M requests + 400k GB-s/month | ~5k invocations | $0.00 |
 | DynamoDB | Always-free: 25 GB + 25 RCU/25 WCU provisioned | 1 RCU / 1 WCU, KB of data | $0.00 |
 | DynamoDB PITR | ~$0.20/GB-month | KB | ~$0.00 |
 | CloudWatch Logs / alarms | 5 GB logs free, 10 alarms free | <100 MB, 5 alarms | $0.00 |
+| CloudFront standard logs (S3) | S3 storage for the logs, 30-day expiry | <100 MB | ~$0.00 |
 | SNS email | 1,000 email notifications free | a handful | $0.00 |
 | AWS Budgets | budgets without actions are free | 1 | $0.00 |
 | **Total** | | | **~$1.75/month** with a custom domain, **~$0.01/month** without |
@@ -331,44 +334,24 @@ This design proposes the `aws_resume-` prefix to match the existing
 
 ---
 
-## Open questions
+## Owner decisions (answered 2026-10-28)
 
-The owner needs to answer these before Phase 2 starts. Each has a working
-default so the design is complete either way.
+The ADRs stay **Proposed** until the owner reviews and accepts them. The
+answers below are already reflected in this overview and the ADRs.
 
-1. **Custom domain?** Default: yes, buy a new domain in Route 53 (~$15/year
-   for .com). Which name? Do you already own one at another registrar? If so,
-   ADR-0005 uses NS delegation instead of a Route 53 purchase. Answering "no
-   domain" drops Route 53 and ACM and uses the `*.cloudfront.net` URL.
-2. **AWS region:** default `us-east-1`. Any reason to prefer another (for
-   example data residency)? Only the API, Lambda and DynamoDB would move. The
-   cert and CloudFront metrics stay in us-east-1.
-3. **Backend scope:** default is a visitor counter only. Do you want anything
-   else in v1 (contact form → SES, which would add PII handling and a spam
-   problem; "download PDF" tracking; etc.)? Anything with PII changes the
-   data classification and security section.
-4. **Frontend framework:** default is plain HTML/CSS plus a small vanilla JS
-   file for the counter, with no build step beyond minification. Alternatives:
-   a static site generator (Hugo/Astro) or React/Vite. This affects the
-   frontend pipeline's build and test stages only, not the infrastructure.
-5. **Same AWS account as `tf_pr_reviewer` / `tf_pr_bot`, or a dedicated one?**
-   Default: same account, isolated by the `aws-resume-*` name prefix and the
-   permissions boundary. A dedicated account under AWS Organizations is the
-   stronger blast-radius boundary and a good interview topic, but it adds
-   setup work.
-6. **Account free-tier type:** was the account created before 15 July 2025
-   (legacy 12-month free tier) or after (new credit-based Free plan, which
-   expires after 6 months unless upgraded to a Paid plan)? This affects the
-   API Gateway line in the cost table and whether the account can close itself.
-7. **Lambda language:** default Python (latest Lambda-supported 3.x), which
-   matches `tf_pr_bot`. TypeScript/Node is the alternative if you want
-   frontend/backend language parity.
-8. **CloudFront access logs:** off by default. Do you want visitor analytics
-   (CloudFront logs to S3, or a privacy-friendly third-party script)?
-9. **CloudFront flat-rate "Free" plan:** AWS now offers flat-rate CloudFront
-   plans, including a $0 tier with lower limits (1M requests, 100 GB). The
-   default is pay-as-you-go plus the always-free tier, which is more generous
-   and well supported in Terraform. Should the flat-rate plans be evaluated later?
-10. **Approval gates:** default is required reviewer (you) on the
-    `aws-resume-prod-infra` environment only. Backend and frontend deploy
-    automatically on merge. Do you want approval on those too?
+| # | Question | Decision |
+|---|---|---|
+| 1 | Custom domain? | **Yes.** The owner will buy one in Route 53 (ADR-0005). The domain name is still to be chosen. The code keeps the domain optional until then |
+| 2 | Region | **`us-east-1`** |
+| 3 | Backend scope | **Visitor counter only** for v1. No PII-handling features |
+| 4 | Frontend | **Plain HTML/CSS plus vanilla JS**, with a clean, polished design. No framework or build step beyond minification |
+| 5 | AWS account | **Same account** as the sibling projects. Group resources with the `aws-resume-` name prefix and the `Project = aws-resume` tag (ADR-0002) |
+| 6 | Free-tier type | **Legacy account**, created well before 15 July 2025. The 12-month free tier has ended. Always-free tiers (Lambda, DynamoDB, CloudFront, CloudWatch) still apply. API Gateway bills at $1/M requests from the first request (cents at this scale) |
+| 7 | Lambda language | **Python** |
+| 8 | CloudFront logs | **On.** Standard logs go to a private S3 bucket with 30-day expiry (§5). They help debugging and security forensics and satisfy the scanner check. Short retention because they contain viewer IPs |
+| 9 | CloudFront flat-rate plan | **Stay on pay-as-you-go** with the always-free tier for v1. Revisit if the flat-rate plan's bundled WAF becomes attractive |
+| 10 | Approval gates | **Required reviewer on all three** environments: `aws-resume-prod-{infra,backend,frontend}`. The repo is public, so environment protection rules are free |
+
+### Still open
+
+- **Domain name:** the code keeps the domain optional until it's bought.

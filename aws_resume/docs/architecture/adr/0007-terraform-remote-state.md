@@ -1,5 +1,5 @@
 # 0007. Terraform remote state: dedicated S3 bucket with native locking
-Status: Proposed
+Status: Accepted
 Date: 2026-10-23
 
 ## Context

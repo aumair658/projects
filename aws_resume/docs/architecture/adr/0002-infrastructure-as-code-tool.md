@@ -1,5 +1,5 @@
 # 0002. IaC tool: Terraform
-Status: Proposed
+Status: Accepted
 Date: 2026-10-23
 
 ## Context

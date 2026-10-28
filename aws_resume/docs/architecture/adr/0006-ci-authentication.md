@@ -1,5 +1,5 @@
 # 0006. CI authentication: GitHub OIDC, environment-pinned roles per pipeline
-Status: Proposed
+Status: Accepted
 Date: 2026-10-23
 
 ## Context

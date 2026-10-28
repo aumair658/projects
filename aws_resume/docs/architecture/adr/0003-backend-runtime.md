@@ -1,5 +1,5 @@
 # 0003. Backend runtime: API Gateway HTTP API + Lambda (Python)
-Status: Proposed
+Status: Accepted
 Date: 2026-10-23
 
 ## Context

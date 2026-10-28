@@ -1,5 +1,5 @@
 # 0005. Domain and DNS: Route 53 + ACM, custom domain
-Status: Proposed
+Status: Accepted
 Date: 2026-10-23
 
 ## Context

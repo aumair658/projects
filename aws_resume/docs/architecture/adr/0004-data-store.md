@@ -1,5 +1,5 @@
 # 0004. Data store: DynamoDB with minimal provisioned capacity
-Status: Proposed
+Status: Accepted
 Date: 2026-10-23
 
 ## Context

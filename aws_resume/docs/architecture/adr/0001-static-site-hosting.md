@@ -1,5 +1,5 @@
 # 0001. Static site hosting: private S3 + CloudFront with OAC
-Status: Proposed
+Status: Accepted
 Date: 2026-10-23
 
 ## Context

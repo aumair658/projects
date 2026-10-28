@@ -1,12 +1,12 @@
 # aws_resume: Architecture Overview
 
-Status: **Proposed** (draft for owner review)
+Status: **Accepted** (2026-10-28). See the [design security review](../security/design-review-2026-10-28.md) for required follow-ups
 Date: 2026-10-23
 Author: aws-resume-architect subagent
 
 This document describes the proposed architecture for the AWS-hosted resume
 site. The decisions behind it are recorded as ADRs in [`adr/`](adr/). They
-are all `Proposed` until the owner accepts them. Anything below that rests on
+were accepted by the owner on 2026-10-28. Anything below that rests on
 an **assumption** about the owner's preferences is marked _(assumption)_ and
 repeated under [Open questions](#open-questions).
 
@@ -324,20 +324,19 @@ This design proposes the `aws_resume-` prefix to match the existing
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](adr/0001-static-site-hosting.md) | Static site hosting: private S3 + CloudFront with OAC | Proposed |
-| [0002](adr/0002-infrastructure-as-code-tool.md) | IaC tool: Terraform | Proposed |
-| [0003](adr/0003-backend-runtime.md) | Backend runtime: API Gateway HTTP API + Lambda (Python) | Proposed |
-| [0004](adr/0004-data-store.md) | Data store: DynamoDB, provisioned minimal capacity | Proposed |
-| [0005](adr/0005-domain-and-dns.md) | Domain and DNS: Route 53 + ACM, custom domain | Proposed |
-| [0006](adr/0006-ci-authentication.md) | CI authentication: GitHub OIDC, environment-pinned roles per pipeline | Proposed |
-| [0007](adr/0007-terraform-remote-state.md) | Terraform remote state: dedicated S3 bucket with native locking | Proposed |
+| [0001](adr/0001-static-site-hosting.md) | Static site hosting: private S3 + CloudFront with OAC | Accepted |
+| [0002](adr/0002-infrastructure-as-code-tool.md) | IaC tool: Terraform | Accepted |
+| [0003](adr/0003-backend-runtime.md) | Backend runtime: API Gateway HTTP API + Lambda (Python) | Accepted |
+| [0004](adr/0004-data-store.md) | Data store: DynamoDB, provisioned minimal capacity | Accepted |
+| [0005](adr/0005-domain-and-dns.md) | Domain and DNS: Route 53 + ACM, custom domain | Accepted |
+| [0006](adr/0006-ci-authentication.md) | CI authentication: GitHub OIDC, environment-pinned roles per pipeline | Accepted |
+| [0007](adr/0007-terraform-remote-state.md) | Terraform remote state: dedicated S3 bucket with native locking | Accepted |
 
 ---
 
 ## Owner decisions (answered 2026-10-28)
 
-The ADRs stay **Proposed** until the owner reviews and accepts them. The
-answers below are already reflected in this overview and the ADRs.
+The answers below are already reflected in this overview and the ADRs.
 
 | # | Question | Decision |
 |---|---|---|

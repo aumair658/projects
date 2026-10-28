@@ -51,11 +51,12 @@ protection + required checks on `main`.
 
 ### Phase 1 — Architecture
 - [x] Run architect agent → draft architecture overview (`docs/architecture/overview.md`)
-- [x] Architect drafts ADRs (hosting, IaC tool, backend runtime, data store, domain/DNS, CI auth, remote state) — ADR 0001–0007, all Proposed
+- [x] Architect drafts ADRs (hosting, IaC tool, backend runtime, data store, domain/DNS, CI auth, remote state) — ADR 0001–0007
 - [x] Answer the open questions in `docs/architecture/overview.md` (see "Owner decisions" section)
 - [ ] Choose and buy the domain name in Route 53
-- [ ] Review & approve architecture + ADRs
-- [ ] Create security subagent; have it critique the approved design
+- [x] Review & approve architecture + ADRs (accepted 2026-10-28)
+- [x] Create security subagent (`.claude/agents/aws-resume-security.md`); have it critique the approved design → `docs/security/design-review-2026-10-28.md`
+- [ ] Owner decides on security findings SEC-001–SEC-011, then fold the fixes into ADRs/tasks
 
 ### Phase 2 — Foundations & infra pipeline
 - [ ] Repo layout: `infra/` (+ `infra/bootstrap/`), `backend/`, `frontend/`, `docs/`
@@ -108,3 +109,4 @@ protection + required checks on `main`.
 | 2026-10-28 | Naming `aws-resume-*`; tags `Project=aws-resume`, `Environment=prod`, `ManagedBy=terraform`, `Repo`; `Project` activated as a cost allocation tag |
 | 2026-10-28 | CloudFront standard logs on → private S3 log bucket, 30-day expiry |
 | 2026-10-28 | Required-reviewer approval on all three pipelines; Python for Lambda; CloudFront stays on pay-as-you-go |
+| 2026-10-28 | ADRs 0001–0007 accepted. Design security review: proceed with fixes (1 Critical, 3 High, 3 Medium, 3 Low, 1 Info) |

@@ -56,10 +56,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Read-only role: its trust policy only accepts the pull_request
+      # OIDC subject, and it has no write permissions on the stack.
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.TF_PR_REVIEWER_AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.TF_PR_REVIEWER_AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform

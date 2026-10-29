@@ -46,9 +46,11 @@ It's scoped with a `paths:` filter so it only triggers on changes under
 - **Merges to `main`** (that touch this directory) run `terraform apply`
   automatically.
 - AWS auth is via **OIDC role assumption** — no long-lived AWS keys are
-  stored in GitHub. The workflow assumes an IAM role using the
-  `TF_PR_REVIEWER_AWS_ROLE_ARN` repo variable (namespaced by project name,
-  since other projects in the monorepo will get their own roles/variables).
+  stored in GitHub. There are two roles: PR plans assume a read-only role
+  (`TF_PR_REVIEWER_AWS_PLAN_ROLE_ARN`, trusts only `pull_request`), and the
+  apply job assumes the apply role (`TF_PR_REVIEWER_AWS_ROLE_ARN`, trusts only
+  the `production` environment). Variables are namespaced by project name,
+  since other projects in the monorepo get their own roles/variables.
 
 ### One-time setup (do this before the pipeline can run)
 
@@ -59,9 +61,11 @@ It's scoped with a `paths:` filter so it only triggers on changes under
    `bootstrap/README.md` for the full steps.
 2. Take the `bootstrap` outputs and:
    - Fill `bucket` / `dynamodb_table` into `backend.tf` here.
-   - Set the `TF_PR_REVIEWER_AWS_ROLE_ARN` GitHub Actions repo variable at
+   - Set the `TF_PR_REVIEWER_AWS_ROLE_ARN` and
+     `TF_PR_REVIEWER_AWS_PLAN_ROLE_ARN` GitHub Actions repo variables at
      the monorepo root (Settings → Secrets and variables → Actions →
-     Variables) to the `github_actions_role_arn` output.
+     Variables) to the `github_actions_role_arn` and
+     `github_actions_plan_role_arn` outputs.
 3. Run `terraform init` in this directory once to migrate to the S3
    backend, commit `backend.tf`, and push. From then on, PRs plan and
    merges to `main` apply — no one needs to run `terraform apply` locally.

@@ -35,7 +35,25 @@ variable "create_oidc_provider" {
 }
 
 variable "role_name" {
-  description = "Name of the IAM role GitHub Actions will assume"
+  description = "Name of the apply role, assumed only by the apply job on main (via the GitHub Environment below)"
   type        = string
   default     = "tf-pr-reviewer-test-github-actions"
+}
+
+variable "plan_role_name" {
+  description = "Name of the read-only plan role, assumed only by pull_request runs"
+  type        = string
+  default     = "tf-pr-reviewer-test-github-actions-plan"
+}
+
+variable "apply_environment" {
+  description = "GitHub Environment the apply job declares. The apply role trusts only this environment's OIDC subject, so applying always passes through its required-reviewer gate."
+  type        = string
+  default     = "production"
+}
+
+variable "app_bucket_name" {
+  description = "Name of the fixture's S3 bucket (must match bucket_name in the parent stack). Both roles' S3 permissions are scoped to it."
+  type        = string
+  default     = "tf-pr-reviewer-test-bucket-change-me"
 }

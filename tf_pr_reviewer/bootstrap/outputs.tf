@@ -9,6 +9,11 @@ output "lock_table_name" {
 }
 
 output "github_actions_role_arn" {
-  description = "Paste into the TF_PR_REVIEWER_AWS_ROLE_ARN GitHub Actions repo variable (set at the monorepo root, since that's where the repo/OIDC trust lives)"
+  description = "Apply role. Paste into the TF_PR_REVIEWER_AWS_ROLE_ARN GitHub Actions repo variable (set at the monorepo root, since that's where the repo/OIDC trust lives)"
   value       = aws_iam_role.github_actions.arn
+}
+
+output "github_actions_plan_role_arn" {
+  description = "Read-only plan role. Paste into the TF_PR_REVIEWER_AWS_PLAN_ROLE_ARN GitHub Actions repo variable"
+  value       = aws_iam_role.github_actions_plan.arn
 }
